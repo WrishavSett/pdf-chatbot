@@ -1,0 +1,129 @@
+# app.py
+
+# -------------------------
+# Imports
+# -------------------------
+
+import requests
+import streamlit as st
+
+API_BASE_URL = "http://localhost:8000"
+
+st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
+
+# -------------------------
+# Session State Initialization
+# -------------------------
+
+if "uploaded" not in st.session_state:
+    st.session_state.uploaded = False
+
+if "summary" not in st.session_state:
+    st.session_state.summary = None
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# -------------------------
+# Helper Functions
+# -------------------------
+
+def reset_chat():
+    try:
+        requests.post(f"{API_BASE_URL}/reset")
+    except Exception:
+        pass
+
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    st.rerun()
+
+def upload_pdf(file):
+    with st.spinner("Processing PDF. Please wait..."):
+        response = requests.post(
+            f"{API_BASE_URL}/upload",
+            files={"file": file},
+            timeout=None
+        )
+
+    response.raise_for_status()
+    return response.json()["summary"]
+
+def stream_answer(question):
+    response = requests.post(
+        f"{API_BASE_URL}/chat",
+        json={"question": question},
+        stream=True
+    )
+
+    response.raise_for_status()
+
+    for chunk in response.iter_content(chunk_size=None):
+        if chunk:
+            yield chunk.decode("utf-8")
+
+# -------------------------
+# UI Rendering
+# -------------------------
+
+st.title("PDF Chatbot")
+
+# --- New Chat Button (only after upload) ---
+if st.session_state.uploaded:
+    if st.button("New Chat"):
+        reset_chat()
+
+# --- Upload Screen ---
+if not st.session_state.uploaded:
+    st.subheader("Upload a PDF to begin")
+
+    uploaded_file = st.file_uploader(
+        "Choose a PDF file",
+        type=["pdf"],
+        accept_multiple_files=False
+    )
+
+    if uploaded_file is not None:
+        summary = upload_pdf(uploaded_file)
+
+        st.session_state.uploaded = True
+        st.session_state.summary = summary
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": summary}
+        )
+
+        st.rerun()
+
+# --- Chat Screen ---
+else:
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat input
+    user_input = st.chat_input("Ask a question about the document")
+
+    if user_input:
+        # Add user message
+        st.session_state.messages.append(
+            {"role": "user", "content": user_input}
+        )
+
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        # Stream assistant response
+        with st.chat_message("assistant"):
+            placeholder = st.empty()
+            streamed_text = ""
+
+            for token in stream_answer(user_input):
+                streamed_text += token
+                placeholder.markdown(streamed_text)
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": streamed_text}
+        )
