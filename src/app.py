@@ -18,6 +18,9 @@ st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
 if "uploaded" not in st.session_state:
     st.session_state.uploaded = False
 
+if "session_id" not in st.session_state:
+    st.session_state.session_id = None
+
 if "summary" not in st.session_state:
     st.session_state.summary = None
 
@@ -29,11 +32,17 @@ if "messages" not in st.session_state:
 # -------------------------
 
 def reset_chat():
-    try:
-        requests.post(f"{API_BASE_URL}/reset")
-    except Exception:
-        pass
+    # Send reset request with session_id if available
+    if st.session_state.session_id:
+        try:
+            requests.post(
+                f"{API_BASE_URL}/reset",
+                json={"session_id": st.session_state.session_id}
+            )
+        except Exception:
+            pass
 
+    # Clear all session state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
@@ -48,12 +57,16 @@ def upload_pdf(file):
         )
 
     response.raise_for_status()
-    return response.json()["summary"]
+    data = response.json()
+    return data["session_id"], data["summary"]
 
 def stream_answer(question):
     response = requests.post(
         f"{API_BASE_URL}/chat",
-        json={"question": question},
+        json={
+            "question": question,
+            "session_id": st.session_state.session_id
+        },
         stream=True
     )
 
@@ -85,9 +98,10 @@ if not st.session_state.uploaded:
     )
 
     if uploaded_file is not None:
-        summary = upload_pdf(uploaded_file)
+        session_id, summary = upload_pdf(uploaded_file)
 
         st.session_state.uploaded = True
+        st.session_state.session_id = session_id
         st.session_state.summary = summary
 
         st.session_state.messages.append(

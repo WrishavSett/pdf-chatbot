@@ -5,8 +5,9 @@
 # -------------------------
 
 import os
+import uuid
 import tempfile
-from typing import Generator
+from typing import Generator, Dict
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -25,23 +26,29 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------
-# In-Memory Session Store
+# Session Store (Multiple Sessions)
 # -------------------------
 
-_active_session: AISession | None = None
+_sessions: Dict[str, AISession] = {}
 
-def get_session() -> AISession:
-    if _active_session is None:
+def get_session(session_id: str) -> AISession:
+    if session_id not in _sessions:
         raise RuntimeError("No active session found.")
-    return _active_session
+    return _sessions[session_id]
 
-def set_session(session: AISession):
-    global _active_session
-    _active_session = session
+def set_session(session_id: str, session: AISession):
+    _sessions[session_id] = session
 
-def clear_session():
-    global _active_session
-    _active_session = None
+def clear_session(session_id: str):
+    if session_id in _sessions:
+        session = _sessions[session_id]
+        # Explicitly delete vectorstore
+        if session.vectorstore:
+            try:
+                session.vectorstore.delete_collection()
+            except Exception:
+                pass
+        del _sessions[session_id]
 
 # -------------------------
 # Upload & Process PDF
@@ -54,7 +61,7 @@ def upload_pdf():
     2. Parses PDF
     3. Generates summary
     4. Builds vector store
-    5. Returns summary
+    5. Returns summary and session_id
     """
 
     if "file" not in request.files:
@@ -72,10 +79,14 @@ def upload_pdf():
 
     try:
         session = initialize_session(pdf_path)
-        set_session(session)
+        
+        # Generate unique session ID
+        session_id = str(uuid.uuid4())
+        set_session(session_id, session)
 
         return jsonify(
             {
+                "session_id": session_id,
                 "summary": session.summary
             }
         )
@@ -99,10 +110,14 @@ def chat():
     if not data or "question" not in data:
         return jsonify({"error": "Missing question"}), 400
 
+    if "session_id" not in data:
+        return jsonify({"error": "Missing session_id"}), 400
+
     question = data["question"]
+    session_id = data["session_id"]
 
     try:
-        session = get_session()
+        session = get_session(session_id)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -110,10 +125,6 @@ def chat():
         for token in stream_rag_answer(session, question):
             yield token
 
-    # return Response(
-    #     generate(),
-    #     mimetype="text/plain"
-    # )
     return Response(
         stream_with_context(generate()),
         mimetype="text/plain"
@@ -132,7 +143,12 @@ def reset():
     - Memory
     """
 
-    clear_session()
+    data = request.get_json()
+    
+    if data and "session_id" in data:
+        session_id = data["session_id"]
+        clear_session(session_id)
+    
     return jsonify({"status": "reset successful"})
 
 # -------------------------

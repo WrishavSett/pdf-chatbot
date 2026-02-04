@@ -5,6 +5,7 @@
 # -------------------------
 
 import os
+import uuid
 from typing import List, Dict, Generator, Optional
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -58,6 +59,7 @@ class AISession:
         self.vectorstore: Optional[Chroma] = None
         self.summary: Optional[str] = None
         self.chat_history: List = []
+        self.collection_name: str = f"rag_collection_{uuid.uuid4().hex[:8]}"
 
         self._llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -123,11 +125,13 @@ def generate_summary(llm: ChatOpenAI, docs: List[Document]) -> str:
 
 def create_vectorstore(
     docs: List[Document],
-    embeddings: OpenAIEmbeddings
+    embeddings: OpenAIEmbeddings,
+    collection_name: str
 ) -> Chroma:
     return Chroma.from_documents(
         documents=docs,
-        embedding=embeddings
+        embedding=embeddings,
+        collection_name=collection_name
     )
 
 # -------------------------
@@ -208,10 +212,6 @@ def stream_rag_answer(
 
     context_text = "\n\n".join(doc.page_content for doc in docs)
 
-    # prompt = RAG_PROMPT.format(
-    #     context=context_text,
-    #     question=question
-    # )
     messages = RAG_PROMPT.format_messages(
         context=context_text,
         question=question
@@ -245,7 +245,8 @@ def initialize_session(pdf_path: str) -> AISession:
     session.summary = generate_summary(session._llm, session.documents)
     session.vectorstore = create_vectorstore(
         session.documents,
-        session._embeddings
+        session._embeddings,
+        session.collection_name
     )
 
     session._rag_graph = build_rag_graph(session)
