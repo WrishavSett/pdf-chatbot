@@ -8,6 +8,7 @@ import os
 import uuid
 import tempfile
 from typing import Generator, Dict
+import logging
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -16,6 +17,12 @@ from core_ai import (
     AISession,
     initialize_session,
     stream_rag_answer
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
 # -------------------------
@@ -56,41 +63,37 @@ def clear_session(session_id: str):
 
 @app.route("/upload", methods=["POST"])
 def upload_pdf():
-    """
-    1. Accepts PDF upload
-    2. Parses PDF
-    3. Generates summary
-    4. Builds vector store
-    5. Returns summary and session_id
-    """
-
+    logging.info("Received request to upload PDF.")
     if "file" not in request.files:
+        logging.warning("No file uploaded in the request.")
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
 
     if not file.filename.lower().endswith(".pdf"):
+        logging.warning("Uploaded file is not a PDF.")
         return jsonify({"error": "Only PDF files are supported"}), 400
 
-    # Save PDF temporarily (session-scoped)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         file.save(tmp.name)
         pdf_path = tmp.name
 
     try:
+        logging.info("Initializing session for uploaded PDF.")
         session = initialize_session(pdf_path)
-        
-        # Generate unique session ID
         session_id = str(uuid.uuid4())
         set_session(session_id, session)
 
+        logging.info(f"Session initialized successfully with ID: {session_id}")
         return jsonify(
             {
                 "session_id": session_id,
                 "summary": session.summary
             }
         )
-
+    except Exception as e:
+        logging.error(f"Error processing uploaded PDF: {e}")
+        return jsonify({"error": "Failed to process PDF"}), 500
     finally:
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
@@ -101,16 +104,15 @@ def upload_pdf():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """
-    Streams QA responses token-by-token.
-    """
-
+    logging.info("Received chat request.")
     data = request.get_json()
 
     if not data or "question" not in data:
+        logging.warning("Chat request missing 'question' field.")
         return jsonify({"error": "Missing question"}), 400
 
     if "session_id" not in data:
+        logging.warning("Chat request missing 'session_id' field.")
         return jsonify({"error": "Missing session_id"}), 400
 
     question = data["question"]
@@ -118,17 +120,22 @@ def chat():
 
     try:
         session = get_session(session_id)
+        logging.info(f"Streaming response for session ID: {session_id}")
+
+        def generate() -> Generator[str, None, None]:
+            for token in stream_rag_answer(session, question):
+                yield token
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype="text/plain"
+        )
     except RuntimeError as e:
+        logging.error(f"Runtime error: {e}")
         return jsonify({"error": str(e)}), 400
-
-    def generate() -> Generator[str, None, None]:
-        for token in stream_rag_answer(session, question):
-            yield token
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/plain"
-    )
+    except Exception as e:
+        logging.error(f"Error during chat processing: {e}")
+        return jsonify({"error": "Failed to process chat request"}), 500
 
 # -------------------------
 # Reset Session
@@ -136,19 +143,14 @@ def chat():
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    """
-    Clears all session data:
-    - PDF
-    - Vector store
-    - Memory
-    """
-
+    logging.info("Received request to reset session.")
     data = request.get_json()
-    
+
     if data and "session_id" in data:
         session_id = data["session_id"]
         clear_session(session_id)
-    
+        logging.info(f"Session {session_id} cleared successfully.")
+
     return jsonify({"status": "reset successful"})
 
 # -------------------------

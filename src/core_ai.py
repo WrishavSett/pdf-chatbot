@@ -7,6 +7,7 @@
 import os
 import uuid
 from typing import List, Dict, Generator, Optional
+import logging
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.documents import Document
@@ -19,6 +20,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 
 from langgraph.graph import StateGraph, END
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 # -------------------------
 # Load API Key
@@ -85,39 +92,52 @@ class AISession:
 # -------------------------
 
 def load_and_split_pdf(pdf_path: str) -> List[Document]:
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
+    logging.info(f"Loading and splitting PDF: {pdf_path}")
+    try:
+        loader = PyPDFLoader(pdf_path)
+        docs = loader.load()
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=150
-    )
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=150
+        )
 
-    return splitter.split_documents(docs)
+        logging.info("PDF successfully split into chunks.")
+        return splitter.split_documents(docs)
+    except Exception as e:
+        logging.error(f"Error loading and splitting PDF: {e}")
+        raise
 
 # -------------------------
 # Summary Generation
 # -------------------------
 
 def generate_summary(llm: ChatOpenAI, docs: List[Document]) -> str:
-    full_text = "\n\n".join(doc.page_content for doc in docs)
+    logging.info("Generating summary for the document.")
+    try:
+        full_text = "\n\n".join(doc.page_content for doc in docs)
 
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            "You are an expert analyst. Generate a concise, high-level summary "
-            "of the following document. Do not add external information."
-        ),
-        ("human", "{text}")
-    ])
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are an expert analyst. Generate a concise, high-level summary "
+                "of the following document. Do not add external information."
+            ),
+            ("human", "{text}")
+        ])
 
-    chain = (
-        prompt
-        | llm
-        | StrOutputParser()
-    )
+        chain = (
+            prompt
+            | llm
+            | StrOutputParser()
+        )
 
-    return chain.invoke({"text": full_text})
+        summary = chain.invoke({"text": full_text})
+        logging.info("Summary generation completed.")
+        return summary
+    except Exception as e:
+        logging.error(f"Error generating summary: {e}")
+        raise
 
 # -------------------------
 # Vector Store Creation
@@ -232,23 +252,21 @@ def stream_rag_answer(
 # -------------------------
 
 def initialize_session(pdf_path: str) -> AISession:
-    """
-    Creates and fully prepares a session:
-    - Parse PDF
-    - Generate summary
-    - Populate vector store
-    """
+    logging.info("Initializing AI session.")
+    try:
+        session = AISession()
 
-    session = AISession()
+        session.documents = load_and_split_pdf(pdf_path)
+        session.summary = generate_summary(session._llm, session.documents)
+        session.vectorstore = create_vectorstore(
+            session.documents,
+            session._embeddings,
+            session.collection_name
+        )
 
-    session.documents = load_and_split_pdf(pdf_path)
-    session.summary = generate_summary(session._llm, session.documents)
-    session.vectorstore = create_vectorstore(
-        session.documents,
-        session._embeddings,
-        session.collection_name
-    )
-
-    session._rag_graph = build_rag_graph(session)
-
-    return session
+        session._rag_graph = build_rag_graph(session)
+        logging.info("AI session initialized successfully.")
+        return session
+    except Exception as e:
+        logging.error(f"Error initializing session: {e}")
+        raise

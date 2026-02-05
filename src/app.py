@@ -6,8 +6,15 @@
 
 import requests
 import streamlit as st
+import logging
 
 API_BASE_URL = "http://localhost:8000"
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
 
@@ -32,49 +39,65 @@ if "messages" not in st.session_state:
 # -------------------------
 
 def reset_chat():
+    logging.info("Resetting chat session.")
     # Send reset request with session_id if available
     if st.session_state.session_id:
         try:
+            logging.info(f"Sending reset request for session ID: {st.session_state.session_id}")
             requests.post(
                 f"{API_BASE_URL}/reset",
                 json={"session_id": st.session_state.session_id}
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error(f"Error during reset request: {e}")
 
     # Clear all session state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
+    logging.info("Chat session reset successfully.")
     st.rerun()
 
 def upload_pdf(file):
-    with st.spinner("Processing PDF. Please wait..."):
-        response = requests.post(
-            f"{API_BASE_URL}/upload",
-            files={"file": file},
-            timeout=None
-        )
+    logging.info("Uploading PDF file.")
+    try:
+        with st.spinner("Processing PDF. Please wait..."):
+            response = requests.post(
+                f"{API_BASE_URL}/upload",
+                files={"file": file},
+                timeout=None
+            )
 
-    response.raise_for_status()
-    data = response.json()
-    return data["session_id"], data["summary"]
+        response.raise_for_status()
+        data = response.json()
+        logging.info("PDF uploaded and processed successfully.")
+        return data["session_id"], data["summary"]
+    except Exception as e:
+        logging.error(f"Error uploading PDF: {e}")
+        st.error("Failed to upload and process PDF.")
+        raise
 
 def stream_answer(question):
-    response = requests.post(
-        f"{API_BASE_URL}/chat",
-        json={
-            "question": question,
-            "session_id": st.session_state.session_id
-        },
-        stream=True
-    )
+    logging.info(f"Streaming answer for question: {question}")
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/chat",
+            json={
+                "question": question,
+                "session_id": st.session_state.session_id
+            },
+            stream=True
+        )
 
-    response.raise_for_status()
+        response.raise_for_status()
 
-    for chunk in response.iter_content(chunk_size=None):
-        if chunk:
-            yield chunk.decode("utf-8")
+        for chunk in response.iter_content(chunk_size=None):
+            if chunk:
+                yield chunk.decode("utf-8")
+    except Exception as e:
+        logging.error(f"Error streaming answer: {e}")
+        st.error("Failed to get a response from the server.")
+        raise
 
 # -------------------------
 # UI Rendering
