@@ -221,8 +221,7 @@ def build_rag_graph(session: AISession):
 
 def stream_rag_answer(
     session: AISession,
-    question: str,
-    use_history: bool = False
+    question: str
 ) -> Generator[str, None, None]:
     """
     Streams ONLY the QA response tokens.
@@ -236,27 +235,10 @@ def stream_rag_answer(
 
     context_text = "\n\n".join(doc.page_content for doc in docs)
 
-    # messages = RAG_PROMPT.format_messages(
-    #     context=context_text,
-    #     question=question
-    # )
-
-    if use_history and session.chat_history:
-        history_prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a question-answering assistant. "
-                      "Answer using the provided context and conversation history."),
-            *session.chat_history[-6:],  # Last 3 exchanges
-            ("human", "Context:\n{context}\n\nQuestion:\n{question}")
-        ])
-        messages = history_prompt.format_messages(
-            context=context_text,
-            question=question
-        )
-    else:
-        messages = RAG_PROMPT.format_messages(
-            context=context_text,
-            question=question
-        )
+    messages = RAG_PROMPT.format_messages(
+        context=context_text,
+        question=question
+    )
 
     session.chat_history.append(HumanMessage(content=question))
 
