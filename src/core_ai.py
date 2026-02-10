@@ -74,13 +74,6 @@ class AISession:
             api_key=OPENAI_API_KEY
         )
 
-        self._streaming_llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-            streaming=True,
-            api_key=OPENAI_API_KEY
-        )
-
         self._embeddings = OpenAIEmbeddings(
             api_key=OPENAI_API_KEY
         )
@@ -240,7 +233,7 @@ def stream_rag_answer(
     session.chat_history.append(HumanMessage(content=question))
 
     buffer = ""
-    for chunk in session._streaming_llm.stream(messages):
+    for chunk in session._llm.stream(messages):
         if chunk.content:
             buffer += chunk.content
             yield chunk.content
