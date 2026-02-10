@@ -227,9 +227,6 @@ def stream_rag_answer(
     Streams ONLY the QA response tokens.
     """
 
-    if session.vectorstore is None:
-        logging.error("Session not properly initialized: vectorstore is None")
-
     retriever = session.vectorstore.as_retriever(search_kwargs={"k": 4})
     docs = retriever.invoke(question)
 
