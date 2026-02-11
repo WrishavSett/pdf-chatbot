@@ -7,7 +7,6 @@
 import os
 import uuid
 from typing import List, Dict, Generator, Optional
-import logging
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.documents import Document
@@ -20,12 +19,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 
 from langgraph.graph import StateGraph, END
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
 
 # -------------------------
 # Load API Key
@@ -85,7 +78,6 @@ class AISession:
 # -------------------------
 
 def load_and_split_pdf(pdf_path: str) -> List[Document]:
-    logging.info(f"Loading and splitting PDF: {pdf_path}")
     try:
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
@@ -95,10 +87,8 @@ def load_and_split_pdf(pdf_path: str) -> List[Document]:
             chunk_overlap=250
         )
 
-        logging.info("PDF successfully split into chunks.")
         return splitter.split_documents(docs)
     except Exception as e:
-        logging.error(f"Error loading and splitting PDF: {e}")
         raise
 
 # -------------------------
@@ -106,7 +96,6 @@ def load_and_split_pdf(pdf_path: str) -> List[Document]:
 # -------------------------
 
 def generate_summary(llm: ChatOpenAI, docs: List[Document]) -> str:
-    logging.info("Generating summary for the document.")
     try:
         full_text = "\n\n".join(doc.page_content for doc in docs)
 
@@ -126,10 +115,8 @@ def generate_summary(llm: ChatOpenAI, docs: List[Document]) -> str:
         )
 
         summary = chain.invoke({"text": full_text})
-        logging.info("Summary generation completed.")
         return summary
     except Exception as e:
-        logging.error(f"Error generating summary: {e}")
         raise
 
 # -------------------------
@@ -245,7 +232,6 @@ def stream_rag_answer(
 # -------------------------
 
 def initialize_session(pdf_path: str) -> AISession:
-    logging.info("Initializing AI session.")
     try:
         session = AISession()
 
@@ -258,8 +244,6 @@ def initialize_session(pdf_path: str) -> AISession:
         )
 
         session._rag_graph = build_rag_graph(session)
-        logging.info("AI session initialized successfully.")
         return session
     except Exception as e:
-        logging.error(f"Error initializing session: {e}")
         raise
