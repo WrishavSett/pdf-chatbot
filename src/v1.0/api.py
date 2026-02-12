@@ -12,6 +12,10 @@ from typing import Generator, Dict
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 
+import gc
+import time
+import threading
+
 from core_ai import (
     AISession,
     initialize_session,
@@ -26,29 +30,72 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------
-# Session Store (Multiple Sessions)
+# Session Store with TTL
 # -------------------------
 
-_sessions: Dict[str, AISession] = {}
+SESSION_TTL_SECONDS = 900
+'''
+Structure:
+_sessions = {
+    session_id (str): {
+    "session": AISession (object),
+    "last_accessed": timestamp (datetime)
+    }
+}
+'''
+
+_sessions: Dict[str, dict] = {}
+_sessions_lock = threading.Lock()
 
 def get_session(session_id: str) -> AISession:
-    if session_id not in _sessions:
-        raise RuntimeError("No active session found.")
-    return _sessions[session_id]
+    with _sessions_lock:
+        if session_id not in _sessions:
+            raise RuntimeError("No active session found.")
+
+        # Refresh TTL on access
+        _sessions[session_id]["last_accessed"] = time.time()
+        return _sessions[session_id]["session"]
 
 def set_session(session_id: str, session: AISession):
-    _sessions[session_id] = session
+    with _sessions_lock:
+        _sessions[session_id] = {
+            "session": session,
+            "last_accessed": time.time()
+        }
 
 def clear_session(session_id: str):
-    if session_id in _sessions:
-        session = _sessions[session_id]
-        # Explicitly delete vectorstore
-        if session.vectorstore:
-            try:
-                session.vectorstore.delete_collection()
-            except Exception:
-                pass
-        del _sessions[session_id]
+    with _sessions_lock:
+        if session_id in _sessions:
+            session = _sessions[session_id]["session"]
+
+            # Explicitly delete vectorstore collection
+            if session.vectorstore:
+                try:
+                    session.vectorstore.delete_collection()
+                except Exception:
+                    pass
+
+            del _sessions[session_id]
+
+    gc.collect()
+
+# -------------------------
+# Background Cleanup Thread
+# -------------------------
+
+def cleanup_expired_sessions():
+    while True:
+        time.sleep(60)  # Check every 60 seconds
+        now = time.time()
+
+        with _sessions_lock:
+            expired_sessions = [
+                sid for sid, data in _sessions.items()
+                if now - data["last_accessed"] > SESSION_TTL_SECONDS
+            ]
+
+        for sid in expired_sessions:
+            clear_session(sid)
 
 # -------------------------
 # Upload & Process PDF
@@ -144,5 +191,12 @@ def reset():
 #     )
 
 if __name__ == "__main__":
+    # Start background cleanup thread
+    cleanup_thread = threading.Thread(
+        target=cleanup_expired_sessions,
+        daemon=True
+    )
+    cleanup_thread.start()
+
     from waitress import serve
     serve(app, host="0.0.0.0", port=8000)
