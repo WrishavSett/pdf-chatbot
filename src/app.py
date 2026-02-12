@@ -53,26 +53,26 @@ def upload_pdf(file):
         st.error("Failed to upload and process PDF.")
         raise
 
-'''# RAG QA (Streaming)
-def stream_answer(question):
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/chat",
-            json={
-                "question": question,
-                "session_id": st.session_state.session_id
-            },
-            stream=True
-        )
+# # RAG QA (Streaming)
+# def stream_answer(question):
+#     try:
+#         response = requests.post(
+#             f"{API_BASE_URL}/chat",
+#             json={
+#                 "question": question,
+#                 "session_id": st.session_state.session_id
+#             },
+#             stream=True
+#         )
 
-        response.raise_for_status()
+#         response.raise_for_status()
 
-        for chunk in response.iter_content(chunk_size=None):
-            if chunk:
-                yield chunk.decode("utf-8")
-    except Exception as e:
-        st.error("Failed to get a response from the server.")
-        raise'''
+#         for chunk in response.iter_content(chunk_size=None):
+#             if chunk:
+#                 yield chunk.decode("utf-8")
+#     except Exception as e:
+#         st.error("Failed to get a response from the server.")
+#         raise
 
 # RAG QA (Non-Streaming)
 def get_answer(question: str) -> str:
@@ -144,14 +144,14 @@ else:
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        '''# Streaming response
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-            streamed_text = ""
+        # # Streaming response
+        # with st.chat_message("assistant"):
+        #     placeholder = st.empty()
+        #     streamed_text = ""
 
-            for token in stream_answer(user_input):
-                streamed_text += token
-                placeholder.markdown(streamed_text)'''
+        #     for token in stream_answer(user_input):
+        #         streamed_text += token
+        #         placeholder.markdown(streamed_text)
 
         # Non-Streaming response
         with st.chat_message("assistant"):
@@ -159,9 +159,9 @@ else:
                 answer = get_answer(user_input)
             st.markdown(answer)
 
-        '''st.session_state.messages.append(
-            {"role": "assistant", "content": streamed_text}
-        )'''
+        # st.session_state.messages.append(
+        #     {"role": "assistant", "content": streamed_text}
+        # )
 
         st.session_state.messages.append(
             {"role": "assistant", "content": answer}

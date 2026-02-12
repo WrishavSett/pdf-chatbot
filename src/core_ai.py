@@ -184,30 +184,30 @@ def get_rag_answer(
     
     return answer
 
-'''# RAG QA (Streaming)
-def stream_rag_answer(
-    session: AISession,
-    question: str
-) -> Generator[str, None, None]:
-    retriever = session.vectorstore.as_retriever(search_kwargs={"k": 4})
-    docs = retriever.invoke(question)
+# # RAG QA (Streaming)
+# def stream_rag_answer(
+#     session: AISession,
+#     question: str
+# ) -> Generator[str, None, None]:
+#     retriever = session.vectorstore.as_retriever(search_kwargs={"k": 4})
+#     docs = retriever.invoke(question)
 
-    context_text = "\n\n".join(doc.page_content for doc in docs)
+#     context_text = "\n\n".join(doc.page_content for doc in docs)
 
-    messages = RAG_PROMPT.format_messages(
-        context=context_text,
-        question=question
-    )
+#     messages = RAG_PROMPT.format_messages(
+#         context=context_text,
+#         question=question
+#     )
 
-    session.chat_history.append(HumanMessage(content=question))
+#     session.chat_history.append(HumanMessage(content=question))
 
-    buffer = ""
-    for chunk in session._llm.stream(messages):
-        if chunk.content:
-            buffer += chunk.content
-            yield chunk.content
+#     buffer = ""
+#     for chunk in session._llm.stream(messages):
+#         if chunk.content:
+#             buffer += chunk.content
+#             yield chunk.content
 
-    session.chat_history.append(AIMessage(content=buffer))'''
+#     session.chat_history.append(AIMessage(content=buffer))
 
 # Session API provider
 def initialize_session(pdf_path: str) -> AISession:

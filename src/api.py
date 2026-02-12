@@ -16,7 +16,7 @@ import threading
 from core_ai import (
     AISession,
     initialize_session,
-    stream_rag_answer,
+    # stream_rag_answer,
     get_rag_answer
 )
 
@@ -26,13 +26,13 @@ CORS(app)
 
 # Session Store with TTL
 SESSION_TTL_SECONDS = 900
-'''Structure:
-_sessions = {
-    session_id (str): {
-    "session": AISession (object),
-    "last_accessed": timestamp (datetime)
-    }
-}'''
+# Structure:
+# _sessions = {
+#     session_id (str): {
+#     "session": AISession (object),
+#     "last_accessed": timestamp (datetime)
+#     }
+# }
 
 _sessions: Dict[str, dict] = {}
 _sessions_lock = threading.Lock()
@@ -114,35 +114,35 @@ def upload_pdf():
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
 
-'''# RAG QA (Streaming)
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.get_json()
+# # RAG QA (Streaming)
+# @app.route("/chat", methods=["POST"])
+# def chat():
+#     data = request.get_json()
 
-    if not data or "question" not in data:
-        return jsonify({"error": "Missing question"}), 400
+#     if not data or "question" not in data:
+#         return jsonify({"error": "Missing question"}), 400
 
-    if "session_id" not in data:
-        return jsonify({"error": "Missing session_id"}), 400
+#     if "session_id" not in data:
+#         return jsonify({"error": "Missing session_id"}), 400
 
-    question = data["question"]
-    session_id = data["session_id"]
+#     question = data["question"]
+#     session_id = data["session_id"]
 
-    try:
-        session = get_session(session_id)
+#     try:
+#         session = get_session(session_id)
 
-        def generate() -> Generator[str, None, None]:
-            for token in stream_rag_answer(session, question):
-                yield token
+#         def generate() -> Generator[str, None, None]:
+#             for token in stream_rag_answer(session, question):
+#                 yield token
 
-        return Response(
-            stream_with_context(generate()),
-            mimetype="text/plain"
-        )
-    except RuntimeError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": "Failed to process chat request"}), 500'''
+#         return Response(
+#             stream_with_context(generate()),
+#             mimetype="text/plain"
+#         )
+#     except RuntimeError as e:
+#         return jsonify({"error": str(e)}), 400
+#     except Exception as e:
+#         return jsonify({"error": "Failed to process chat request"}), 500
 
 # RAG QA (Non-Streaming)
 @app.route("/chat", methods=["POST"])
@@ -180,13 +180,13 @@ def reset():
 
     return jsonify({"status": "reset successful"})
 
-'''Local Dev entry point
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=8000,
-        debug=True
-    )'''
+# Local Dev entry point
+# if __name__ == "__main__":
+#     app.run(
+#         host="0.0.0.0",
+#         port=8000,
+#         debug=True
+#     )
 
 if __name__ == "__main__":
     cleanup_thread = threading.Thread(
