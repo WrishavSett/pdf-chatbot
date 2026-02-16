@@ -53,17 +53,21 @@ def set_session(session_id: str, session: AISession):
         }
 
 def clear_session(session_id: str):
+    session_to_delete = None
+
     with _sessions_lock:
-        if session_id in _sessions:
-            session = _sessions[session_id]["session"]
+        data = _sessions.get(session_id)
+        if not data:
+            return
 
-            if session.vectorstore:
-                try:
-                    session.vectorstore.delete_collection()
-                except Exception:
-                    pass
+        session_to_delete = data["session"]
+        del _sessions[session_id]
 
-            del _sessions[session_id]
+    if session_to_delete.vectorstore:
+        try:
+            session_to_delete.vectorstore.delete_collection()
+        except Exception:
+            pass
 
     gc.collect()
 
@@ -74,13 +78,28 @@ def cleanup_expired_sessions():
         now = time.time()
 
         with _sessions_lock:
-            expired_sessions = [
-                sid for sid, data in _sessions.items()
-                if now - data["last_accessed"] > SESSION_TTL_SECONDS
-            ]
+            session_ids = list(_sessions.keys())
 
-        for sid in expired_sessions:
-            clear_session(sid)
+        for sid in session_ids:
+            session_to_delete = None
+
+            with _sessions_lock:
+                data = _sessions.get(sid)
+                if not data:
+                    continue
+
+                if now - data["last_accessed"] > SESSION_TTL_SECONDS:
+                    session_to_delete = data["session"]
+                    del _sessions[sid]
+
+            if session_to_delete:
+                if session_to_delete.vectorstore:
+                    try:
+                        session_to_delete.vectorstore.delete_collection()
+                    except Exception:
+                        pass
+
+                gc.collect()
 
 # Upload and Process PDF
 @app.route("/upload", methods=["POST"])
