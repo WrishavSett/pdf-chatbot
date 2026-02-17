@@ -52,6 +52,14 @@ def set_session(session_id: str, session: AISession):
             "last_accessed": time.time()
         }
 
+def _destroy_chroma_collection(session_id: str, session: AISession):
+    if session.vectorstore:
+        try:
+            session.vectorstore.delete_collection()
+        except Exception:
+            pass
+    gc.collect()
+
 def clear_session(session_id: str):
     session_to_delete = None
 
@@ -63,43 +71,30 @@ def clear_session(session_id: str):
         session_to_delete = data["session"]
         del _sessions[session_id]
 
-    if session_to_delete.vectorstore:
-        try:
-            session_to_delete.vectorstore.delete_collection()
-        except Exception:
-            pass
-
-    gc.collect()
+    _destroy_chroma_collection(session_id, session_to_delete)
 
 # Background Cleanup Thread
 def cleanup_expired_sessions():
     while True:
         time.sleep(60)
         now = time.time()
+        sessions_to_delete = []
 
         with _sessions_lock:
-            session_ids = list(_sessions.keys())
-
-        for sid in session_ids:
-            session_to_delete = None
-
-            with _sessions_lock:
-                data = _sessions.get(sid)
-                if not data:
-                    continue
-
+            for sid, data in list(_sessions.items()):
                 if now - data["last_accessed"] > SESSION_TTL_SECONDS:
-                    session_to_delete = data["session"]
+                    sessions_to_delete.append((sid, data["session"]))
                     del _sessions[sid]
 
-            if session_to_delete:
-                if session_to_delete.vectorstore:
-                    try:
-                        session_to_delete.vectorstore.delete_collection()
-                    except Exception:
-                        pass
+        for sid, session in sessions_to_delete:
+            _destroy_chroma_collection(sid, session)
 
-                gc.collect()
+# Start cleanup thread at module level
+cleanup_thread = threading.Thread(
+    target=cleanup_expired_sessions,
+    daemon=True
+)
+cleanup_thread.start()
 
 # Upload and Process PDF
 @app.route("/upload", methods=["POST"])
@@ -208,11 +203,5 @@ def reset():
 #     )
 
 if __name__ == "__main__":
-    cleanup_thread = threading.Thread(
-        target=cleanup_expired_sessions,
-        daemon=True
-    )
-    cleanup_thread.start()
-
     from waitress import serve
     serve(app, host="0.0.0.0", port=8000)
