@@ -163,7 +163,7 @@ RAG_PROMPT = ChatPromptTemplate.from_messages([
 
 # LangGraph Retrieval node
 def retrieve_node(state: ChatState, session: AISession) -> ChatState:
-    retriever = session.vectorstore.as_retriever(search_kwargs={"k": 4})
+    retriever = session.vectorstore.as_retriever(search_kwargs={"k": 6})
     docs = retriever.invoke(state["question"])
     state["context"] = docs
     return state
