@@ -106,6 +106,16 @@ def upload_pdf():
 
     if not file.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Only PDF files are supported"}), 400
+    
+    # Exact file size check
+    file.seek(0, 2)
+    file_size = file.tell()
+    file.seek(0)
+
+    if file_size > (20*1024*1024):
+        return jsonify({
+            "error": f"File too large. Maximum allowed size is 20MB."
+        }), 413
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         file.save(tmp.name)
