@@ -5,6 +5,7 @@ import os
 import uuid
 from typing import List, Dict, Generator, Optional, TypedDict
 
+import tiktoken
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
@@ -22,6 +23,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Shared LLM and Embeddings (module-level singletons)
+_shared_llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0,
+    api_key=OPENAI_API_KEY
+)
+
+_shared_embeddings = OpenAIEmbeddings(
+    api_key=OPENAI_API_KEY
+)
 
 # Session State definition
 class ChatState(TypedDict):
@@ -41,61 +53,87 @@ class ChatState(TypedDict):
 # AISession container
 class AISession:
     def __init__(self):
+        self.pages: List[Document] = []
         self.documents: List[Document] = []
         self.vectorstore: Optional[Chroma] = None
         self.summary: Optional[str] = None
         self.chat_history: List[HumanMessage | AIMessage] = []
         self.collection_name: str = f"rag_collection_{uuid.uuid4().hex[:8]}"
 
-        self._llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-            api_key=OPENAI_API_KEY
-        )
+        self._llm = _shared_llm
 
-        self._embeddings = OpenAIEmbeddings(
-            api_key=OPENAI_API_KEY
-        )
+        self._embeddings = _shared_embeddings
 
         self._rag_graph = None
 
-# PDF processing
-def load_and_split_pdf(pdf_path: str) -> List[Document]:
+# PDF loading
+def load_pdf(pdf_path: str) -> List[Document]:
     try:
         loader = PyPDFLoader(pdf_path)
-        docs = loader.load()
+        return loader.load()
+    except Exception as e:
+        raise
 
+# PDF splitting
+def split_pdf(pages: List[Document]) -> List[Document]:
+    try:
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=250
         )
-
-        return splitter.split_documents(docs)
+        return splitter.split_documents(pages)
     except Exception as e:
         raise
 
+# Map-Reduce prompts
+MAP_PROMPT = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are an expert analyst. Write a concise summary of the following document section."
+    ),
+    ("human", "{text}")
+])
+
+COMBINE_PROMPT = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are an expert analyst. The following are summaries of sections of a document. "
+        "Combine them into a single, concise, high-level summary of the full document. "
+        "Do not add external information."
+    ),
+    ("human", "{text}")
+])
+
 # Summary generation
-def generate_summary(llm: ChatOpenAI, docs: List[Document]) -> str:
+def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
     try:
-        full_text = "\n\n".join(doc.page_content for doc in docs)
+        encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+        full_text = "\n\n".join(doc.page_content for doc in pages)
+        token_count = len(encoding.encode(full_text))
 
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
-                "You are an expert analyst. Generate a concise, high-level summary "
-                "of the following document. Do not add external information."
-            ),
-            ("human", "{text}")
-        ])
+        if token_count < 98000:
+            prompt = ChatPromptTemplate.from_messages([
+                (
+                    "system",
+                    "You are an expert analyst. Generate a concise, high-level summary "
+                    "of the following document. Do not add external information."
+                ),
+                ("human", "{text}")
+            ])
+            chain = prompt | llm | StrOutputParser()
+            return chain.invoke({"text": full_text})
 
-        chain = (
-            prompt
-            | llm
-            | StrOutputParser()
-        )
+        else:
+            # Map: summarize each page in parallel
+            map_chain = MAP_PROMPT | llm | StrOutputParser()
+            summaries = map_chain.batch(
+                [{"text": doc.page_content} for doc in pages]
+            )
 
-        summary = chain.invoke({"text": full_text})
-        return summary
+            # Reduce: combine all summaries into a final summary
+            combine_chain = COMBINE_PROMPT | llm | StrOutputParser()
+            return combine_chain.invoke({"text": "\n\n".join(summaries)})
+
     except Exception as e:
         raise
 
@@ -214,8 +252,9 @@ def initialize_session(pdf_path: str) -> AISession:
     try:
         session = AISession()
 
-        session.documents = load_and_split_pdf(pdf_path)
-        session.summary = generate_summary(session._llm, session.documents)
+        session.pages = load_pdf(pdf_path)
+        session.documents = split_pdf(session.pages)
+        session.summary = generate_summary(session._llm, session.pages)
         session.vectorstore = create_vectorstore(
             session.documents,
             session._embeddings,
