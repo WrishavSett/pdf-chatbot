@@ -113,17 +113,20 @@ if not st.session_state.uploaded:
     )
 
     if uploaded_file is not None:
-        session_id, summary = upload_pdf(uploaded_file)
+        if uploaded_file.size > (20*1024*1024):
+            st.error(f"File too large. Maximum allowed size is 20MB.")
+        else:
+            session_id, summary = upload_pdf(uploaded_file)
 
-        st.session_state.uploaded = True
-        st.session_state.session_id = session_id
-        st.session_state.summary = summary
+            st.session_state.uploaded = True
+            st.session_state.session_id = session_id
+            st.session_state.summary = summary
 
-        st.session_state.messages.append(
-            {"role": "assistant", "content": summary}
-        )
+            st.session_state.messages.append(
+                {"role": "assistant", "content": summary}
+            )
 
-        st.rerun()
+            st.rerun()
 
 # Chat Screen
 else:
