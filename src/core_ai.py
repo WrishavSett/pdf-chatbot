@@ -127,7 +127,8 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
             # Map: summarize each page in parallel
             map_chain = MAP_PROMPT | llm | StrOutputParser()
             summaries = map_chain.batch(
-                [{"text": doc.page_content} for doc in pages]
+                [{"text": doc.page_content} for doc in pages],
+                config={"max_concurrency": 5}
             )
 
             # Reduce: combine all summaries into a final summary
