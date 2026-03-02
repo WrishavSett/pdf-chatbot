@@ -105,7 +105,7 @@ def upload_pdf():
     file = request.files["file"]
 
     if not file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are supported"}), 400
+        return jsonify({"error": "File type not supported. Only PDF files are allowed."}), 415
     
     # Exact file size check
     file.seek(0, 2)
@@ -114,7 +114,7 @@ def upload_pdf():
 
     if file_size > (20*1024*1024):
         return jsonify({
-            "error": f"File too large. Maximum allowed size is 20MB."
+            "error": "File too large. Maximum allowed file size is 20MB."
         }), 413
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -131,7 +131,7 @@ def upload_pdf():
                 "session_id": session_id,
                 "summary": session.summary
             }
-        )
+        ), 201
     except Exception as e:
         return jsonify({"error": "Failed to process PDF"}), 500
     finally:
@@ -164,7 +164,7 @@ def upload_pdf():
 #             mimetype="text/plain"
 #         )
 #     except RuntimeError as e:
-#         return jsonify({"error": str(e)}), 400
+#         return jsonify({"error": str(e)}), 404
 #     except Exception as e:
 #         return jsonify({"error": "Failed to process chat request"}), 500
 
@@ -186,10 +186,10 @@ def chat():
         session = get_session(session_id)
         answer = get_rag_answer(session, question)
         
-        return jsonify({"answer": answer})
+        return jsonify({"answer": answer}), 200
         
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": "Failed to process chat request"}), 500
 
@@ -202,7 +202,7 @@ def reset():
         session_id = data["session_id"]
         clear_session(session_id)
 
-    return jsonify({"status": "reset successful"})
+    return jsonify({"status": "Reset successful"}), 200
 
 # Local Dev entry point
 # if __name__ == "__main__":
