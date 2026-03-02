@@ -4,6 +4,10 @@
 import requests
 import streamlit as st
 
+# Setup logging
+from logger import get_logger
+logger = get_logger("app")
+
 API_BASE_URL = "http://localhost:8000"
 
 st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
@@ -23,18 +27,23 @@ if "messages" not in st.session_state:
 
 # Helper functions
 def reset_chat():
-    if st.session_state.session_id:
+    session_id = st.session_state.session_id
+    logger.info("Reset initiated for session_id=%s", session_id)
+
+    if session_id:
         try:
             requests.post(
                 f"{API_BASE_URL}/reset",
-                json={"session_id": st.session_state.session_id}
+                json={"session_id": session_id}
             )
+            logger.info("Reset API call successful for session_id=%s", session_id)
         except Exception as e:
-            pass
+            logger.warning("Reset API call failed for session_id=%s", session_id, exc_info=True)
 
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
+    logger.debug("Streamlit session state cleared")
     st.rerun()
 
 def upload_pdf(file):
@@ -114,6 +123,7 @@ if not st.session_state.uploaded:
 
     if uploaded_file is not None:
         if uploaded_file.size > (20*1024*1024):
+            logger.warning("File too large (filename=%s, size=%d). Maximum allowed file size is 20MB.", uploaded_file.name, uploaded_file.size)
             st.error(f"File too large. Maximum allowed file size is 20MB.")
         else:
             session_id, summary = upload_pdf(uploaded_file)

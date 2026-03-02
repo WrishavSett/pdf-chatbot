@@ -20,6 +20,10 @@ from core_ai import (
     get_rag_answer
 )
 
+# Setup logging
+from logger import get_logger
+logger = get_logger("api")
+
 # Flask app setup
 app = Flask(__name__)
 CORS(app)
@@ -40,6 +44,7 @@ _sessions_lock = threading.Lock()
 def get_session(session_id: str) -> AISession:
     with _sessions_lock:
         if session_id not in _sessions:
+            logger.warning("Session not found (session_id=%s)", session_id)
             raise RuntimeError("No active session found.")
 
         _sessions[session_id]["last_accessed"] = time.time()
@@ -51,13 +56,17 @@ def set_session(session_id: str, session: AISession):
             "session": session,
             "last_accessed": time.time()
         }
+    
+    logger.info("Session %s registered", session_id)
+    logger.info("Current active sessions=%d", len(_sessions))
 
 def _destroy_chroma_collection(session_id: str, session: AISession):
     if session.vectorstore:
         try:
             session.vectorstore.delete_collection()
+            logger.debug("Chroma collection deleted for session_id=%s", session_id)
         except Exception:
-            pass
+            logger.exception("Failed to delete Chroma collection (session_id=%s)", session_id)
     gc.collect()
 
 def clear_session(session_id: str):
@@ -66,10 +75,14 @@ def clear_session(session_id: str):
     with _sessions_lock:
         data = _sessions.get(session_id)
         if not data:
+            logger.warning("clear_session() called for unknown session_id=%s", session_id)
             return
 
         session_to_delete = data["session"]
         del _sessions[session_id]
+    
+    logger.info("Session %s cleared", session_id)
+    logger.info("Current active sessions=%d", len(_sessions))
 
     _destroy_chroma_collection(session_id, session_to_delete)
 
@@ -87,6 +100,7 @@ def cleanup_expired_sessions():
                     del _sessions[sid]
 
         for sid, session in sessions_to_delete:
+            logger.warning("Expiring session (TTL exceeded) (session_id=%s)", sid)
             _destroy_chroma_collection(sid, session)
 
 # Start cleanup thread at module level
@@ -95,6 +109,7 @@ cleanup_thread = threading.Thread(
     daemon=True
 )
 cleanup_thread.start()
+logger.info("Session cleanup thread started with TTL set to %ds", SESSION_TTL_SECONDS)
 
 # Upload and Process PDF
 @app.route("/upload", methods=["POST"])
@@ -133,6 +148,7 @@ def upload_pdf():
             }
         ), 201
     except Exception as e:
+        logger.exception("Failed to process uploaded PDF (filename=%s)", file.filename)
         return jsonify({"error": "Failed to process PDF"}), 500
     finally:
         if os.path.exists(pdf_path):
@@ -166,6 +182,7 @@ def upload_pdf():
 #     except RuntimeError as e:
 #         return jsonify({"error": str(e)}), 404
 #     except Exception as e:
+#         logger.exception("Failed to process chat request (session_id=%s)", session_id)
 #         return jsonify({"error": "Failed to process chat request"}), 500
 
 # RAG QA (Non-Streaming)
@@ -191,6 +208,7 @@ def chat():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
+        logger.exception("Failed to process chat request (session_id=%s)", session_id)
         return jsonify({"error": "Failed to process chat request"}), 500
 
 # Reset session

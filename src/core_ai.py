@@ -22,7 +22,13 @@ from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 load_dotenv()
 
+# Setup logging
+from logger import get_logger
+logger = get_logger("core_ai")
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.critical("OPENAI_API_KEY is not set")
 
 # Shared LLM and Embeddings (module-level singletons)
 _shared_llm = ChatOpenAI(
@@ -72,6 +78,7 @@ def load_pdf(pdf_path: str) -> List[Document]:
         loader = PyPDFLoader(pdf_path)
         return loader.load()
     except Exception as e:
+        logger.exception("Failed to load PDF from path=%s", pdf_path)
         raise
 
 # PDF splitting
@@ -81,8 +88,11 @@ def split_pdf(pages: List[Document]) -> List[Document]:
             chunk_size=1000,
             chunk_overlap=250
         )
-        return splitter.split_documents(pages)
+        chunks = splitter.split_documents(pages)
+        logger.info("PDF of %d pages split into %d chunks", len(pages), len(chunks))
+        return chunks
     except Exception as e:
+        logger.exception("Failed to split PDF into chunks")
         raise
 
 # Map-Reduce prompts
@@ -110,8 +120,10 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
         encoding = tiktoken.encoding_for_model("gpt-4o-mini")
         full_text = "\n\n".join(doc.page_content for doc in pages)
         token_count = len(encoding.encode(full_text))
+        logger.info("Document token count is %d", token_count)
 
         if token_count < 98000:
+            logger.debug("Using single-pass summarisation (%d token)", token_count)
             prompt = ChatPromptTemplate.from_messages([
                 (
                     "system",
@@ -124,6 +136,7 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
             return chain.invoke({"text": full_text})
 
         else:
+            logger.warning("Using map-reduce summarisation since document exceeds single-pass token limit of 98K (%d tokens)", token_count)
             # Map: summarize each page in parallel
             map_chain = MAP_PROMPT | llm | StrOutputParser()
             summaries = map_chain.batch(
@@ -136,6 +149,7 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
             return combine_chain.invoke({"text": "\n\n".join(summaries)})
 
     except Exception as e:
+        logger.exception("Failed to generate document summary")
         raise
 
 # Vectorstore creation
@@ -144,11 +158,17 @@ def create_vectorstore(
     embeddings: OpenAIEmbeddings,
     collection_name: str
 ) -> Chroma:
-    return Chroma.from_documents(
-        documents=docs,
-        embedding=embeddings,
-        collection_name=collection_name
-    )
+    try:
+        vectorstore = Chroma.from_documents(
+            documents=docs,
+            embedding=embeddings,
+            collection_name=collection_name
+        )
+        logger.info("Successfully created vectorstore %s", collection_name)
+        return vectorstore
+    except Exception as e:
+        logger.exception("Failed to create vectorstore")
+        raise
 
 # RAG prompt
 RAG_PROMPT = ChatPromptTemplate.from_messages([
@@ -265,4 +285,5 @@ def initialize_session(pdf_path: str) -> AISession:
         session._rag_graph = build_rag_graph(session)
         return session
     except Exception as e:
+        logger.exception("Session initialisation failed for pdf_path=%s", pdf_path)
         raise
