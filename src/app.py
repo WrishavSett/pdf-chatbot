@@ -114,7 +114,7 @@ if not st.session_state.uploaded:
 
     if uploaded_file is not None:
         if uploaded_file.size > (20*1024*1024):
-            st.error(f"File too large. Maximum allowed size is 20MB.")
+            st.error(f"File too large. Maximum allowed file size is 20MB.")
         else:
             session_id, summary = upload_pdf(uploaded_file)
 
