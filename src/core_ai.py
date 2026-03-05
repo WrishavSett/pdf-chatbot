@@ -152,6 +152,27 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
         logger.exception("Failed to generate document summary")
         raise
 
+# Summary translation
+TRANSLATE_PROMPT = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        "You are a professional translator. Translate the following text exactly and completely "
+        "into {language}. Preserve all formatting, structure, and meaning precisely. "
+        "Do not summarise, paraphrase, or add anything. Output only the translated text."
+    ),
+    ("human", "{text}")
+])
+
+def translate_summary(llm: ChatOpenAI, summary: str, language: str) -> str:
+    try:
+        chain = TRANSLATE_PROMPT | llm | StrOutputParser()
+        translated = chain.invoke({"text": summary, "language": language})
+        logger.info("Summary translated to %s", language)
+        return translated
+    except Exception as e:
+        logger.exception("Failed to translate summary to %s", language)
+        raise
+
 # Vectorstore creation
 def create_vectorstore(
     docs: List[Document],

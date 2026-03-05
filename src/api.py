@@ -16,6 +16,7 @@ import threading
 from core_ai import (
     AISession,
     initialize_session,
+    translate_summary,
     # stream_rag_answer,
     get_rag_answer
 )
@@ -23,6 +24,12 @@ from core_ai import (
 # Setup logging
 from logger import get_logger
 logger = get_logger("api")
+
+# Supported translation languages
+SUPPORTED_LANGUAGES = [
+    "Spanish", "French", "German", "Hindi", "Bengali",
+    "Arabic", "Chinese (Simplified)", "Japanese", "Portuguese", "Russian"
+]
 
 # Flask app setup
 app = Flask(__name__)
@@ -221,6 +228,38 @@ def reset():
         clear_session(session_id)
 
     return jsonify({"status": "Reset successful"}), 200
+
+# Get supported languages
+@app.route("/languages", methods=["GET"])
+def get_languages():
+    return jsonify({"languages": SUPPORTED_LANGUAGES}), 200
+
+# Translate summary
+@app.route("/translate", methods=["POST"])
+def translate():
+    data = request.get_json()
+
+    if not data or "session_id" not in data:
+        return jsonify({"error": "Missing session_id"}), 400
+
+    if "language" not in data:
+        return jsonify({"error": "Missing language"}), 400
+
+    language = data["language"]
+    if language not in SUPPORTED_LANGUAGES:
+        return jsonify({"error": f"Unsupported language: {language}"}), 400
+
+    session_id = data["session_id"]
+
+    try:
+        session = get_session(session_id)
+        translated = translate_summary(session._llm, session.summary, language)
+        return jsonify({"translated_summary": translated}), 200
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.exception("Failed to translate summary (session_id=%s)", session_id)
+        return jsonify({"error": "Failed to translate summary"}), 500
 
 # Local Dev entry point
 # if __name__ == "__main__":

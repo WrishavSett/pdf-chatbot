@@ -16,6 +16,9 @@ st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
 if "uploaded" not in st.session_state:
     st.session_state.uploaded = False
 
+if "language_selected" not in st.session_state:
+    st.session_state.language_selected = False
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
 
@@ -103,6 +106,31 @@ def get_answer(question: str) -> str:
         st.error("Failed to get a response from the server.")
         raise
 
+def fetch_languages() -> list:
+    try:
+        response = requests.get(f"{API_BASE_URL}/languages")
+        response.raise_for_status()
+        return response.json()["languages"]
+    except Exception as e:
+        st.error("Failed to fetch supported languages.")
+        raise
+
+def translate_summary_request(language: str) -> str:
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/translate",
+            json={
+                "session_id": st.session_state.session_id,
+                "language": language
+            },
+            timeout=None
+        )
+        response.raise_for_status()
+        return response.json()["translated_summary"]
+    except Exception as e:
+        st.error("Failed to translate summary.")
+        raise
+
 # UI Rendering
 st.title("PDF Chatbot")
 
@@ -132,11 +160,36 @@ if not st.session_state.uploaded:
             st.session_state.session_id = session_id
             st.session_state.summary = summary
 
-            st.session_state.messages.append(
-                {"role": "assistant", "content": summary}
-            )
-
             st.rerun()
+
+# Language Selection Screen
+elif not st.session_state.language_selected:
+    st.subheader("Would you like the summary in another language?")
+
+    languages = fetch_languages()
+    options = ["None"] + languages
+    selected = st.selectbox("Select a language", options)
+
+    if st.button("Continue"):
+        if selected == "None":
+            st.session_state.messages.append(
+                {"role": "assistant", "content": st.session_state.summary}
+            )
+        else:
+            with st.spinner(f"Translating summary to {selected}..."):
+                translated = translate_summary_request(selected)
+
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"**Summary (English)**\n\n{st.session_state.summary}"
+            })
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"**Summary ({selected})**\n\n{translated}"
+            })
+
+        st.session_state.language_selected = True
+        st.rerun()
 
 # Chat Screen
 else:
