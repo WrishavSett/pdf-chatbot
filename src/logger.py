@@ -53,6 +53,17 @@ def _configure_root_logger() -> None:
 
 _configure_root_logger()
 
+# Only allow logs from our own modules
+_OWN_LOGGERS = {"api", "app", "core_ai", "logger"}
+
+class _OwnCodeFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        top_level_name = record.name.split(".")[0]
+        return top_level_name in _OWN_LOGGERS
+
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(_OwnCodeFilter())
+
 # Public API
 
 def get_logger(name: str) -> logging.Logger:

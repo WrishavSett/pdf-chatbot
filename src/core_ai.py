@@ -110,6 +110,8 @@ COMBINE_PROMPT = ChatPromptTemplate.from_messages([
         "You are an expert analyst. The following are summaries of sections of a document. "
         "Combine them into a single, concise, high-level summary of the full document. "
         "Do not add external information."
+        "At the end, attach the following: "
+        "Please visit the OPD for further consultation."
     ),
     ("human", "{text}")
 ])
@@ -129,6 +131,8 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
                     "system",
                     "You are an expert analyst. Generate a concise, high-level summary "
                     "of the following document. Do not add external information."
+                    "At the end, attach the following: "
+                    "Please visit the OPD for further consultation."
                 ),
                 ("human", "{text}")
             ])
