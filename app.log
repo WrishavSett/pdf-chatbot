@@ -1,0 +1,10 @@
+2026-03-12 16:03:26 INFO: api | Session cleanup thread started with TTL set to 900s
+2026-03-12 16:04:18 INFO: core_ai | PDF of 4 pages split into 13 chunks
+2026-03-12 16:04:27 INFO: core_ai | Document token count is 2473
+2026-03-12 16:04:27 DEBUG: core_ai | Using single-pass summarisation (2473 token)
+2026-03-12 16:04:56 INFO: core_ai | Successfully created vectorstore rag_collection_90b5859c
+2026-03-12 16:04:56 INFO: api | Session 78fc633f-f281-4e89-8214-a7b3dbb29ea9 registered
+2026-03-12 16:04:56 INFO: api | Current active sessions=1
+2026-03-12 16:05:21 INFO: core_ai | Summary translated to Bengali
+2026-03-12 16:23:26 WARNING: api | Expiring session (TTL exceeded) (session_id=78fc633f-f281-4e89-8214-a7b3dbb29ea9)
+2026-03-12 16:23:26 DEBUG: api | Chroma collection deleted for session_id=78fc633f-f281-4e89-8214-a7b3dbb29ea9
