@@ -3,6 +3,11 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
+
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(_root, ".env"))
+load_dotenv(os.path.join(_root, ".config"))
 
 # Configuration
 LOG_FILE    = os.getenv("LOG_FILE", "app.log")
@@ -11,7 +16,7 @@ LOG_LEVEL   = os.getenv("LOG_LEVEL", "DEBUG").upper()
 # Each individual log file is capped at 5 MB.
 # Up to 3 rotated backups are kept (app.log.1, app.log.2, app.log.3).
 # Total max disk usage: ~20 MB.
-MAX_BYTES   = int(os.getenv("LOG_MAX_BYTES",  str(5 * 1024 * 1024)))  # 5 MB
+MAX_BYTES   = int(os.getenv("MAX_BYTES",  str(5 * 1024 * 1024)))  # 5 MB
 BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "3"))
 
 # 2026-03-02 12:10:00,000 WARNING: api | Session XYZ not found

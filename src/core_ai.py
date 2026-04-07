@@ -1,7 +1,6 @@
 # core_ai.py
 
 # Imports
-import os
 import uuid
 from typing import List, Dict, Generator, Optional, TypedDict
 
@@ -18,26 +17,34 @@ from langchain_chroma import Chroma
 
 from langgraph.graph import StateGraph, END
 
-# Load API key
-from dotenv import load_dotenv
-load_dotenv()
-
 # Setup logging
 from logger import get_logger
 logger = get_logger("core_ai")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+from config import (
+    OPENAI_API_KEY,
+    LLM_MODEL_NAME,
+    LLM_TEMPERATURE,
+    EMBEDDING_MODEL_NAME,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    MAX_TOKENS,
+    MAX_CONCURRENCY,
+    TOP_K,
+)
+
 if not OPENAI_API_KEY:
     logger.critical("OPENAI_API_KEY is not set")
 
 # Shared LLM and Embeddings (module-level singletons)
 _shared_llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0,
+    model=LLM_MODEL_NAME,
+    temperature=LLM_TEMPERATURE,
     api_key=OPENAI_API_KEY
 )
 
 _shared_embeddings = OpenAIEmbeddings(
+    model=EMBEDDING_MODEL_NAME,
     api_key=OPENAI_API_KEY
 )
 
@@ -85,8 +92,8 @@ def load_pdf(pdf_path: str) -> List[Document]:
 def split_pdf(pages: List[Document]) -> List[Document]:
     try:
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=250
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP
         )
         chunks = splitter.split_documents(pages)
         logger.info("PDF of %d pages split into %d chunks", len(pages), len(chunks))
@@ -124,7 +131,7 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
         token_count = len(encoding.encode(full_text))
         logger.info("Document token count is %d", token_count)
 
-        if token_count < 98000:
+        if token_count < MAX_TOKENS:
             logger.debug("Using single-pass summarisation (%d token)", token_count)
             prompt = ChatPromptTemplate.from_messages([
                 (
@@ -140,12 +147,12 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
             return chain.invoke({"text": full_text})
 
         else:
-            logger.warning("Using map-reduce summarisation since document exceeds single-pass token limit of 98K (%d tokens)", token_count)
+            logger.warning("Using map-reduce summarisation since document exceeds single-pass token limit of %dK (%d tokens)", MAX_TOKENS // 1000, token_count)
             # Map: summarize each page in parallel
             map_chain = MAP_PROMPT | llm | StrOutputParser()
             summaries = map_chain.batch(
                 [{"text": doc.page_content} for doc in pages],
-                config={"max_concurrency": 5}
+                config={"max_concurrency": MAX_CONCURRENCY}
             )
 
             # Reduce: combine all summaries into a final summary
@@ -209,7 +216,7 @@ RAG_PROMPT = ChatPromptTemplate.from_messages([
 
 # LangGraph Retrieval node
 def retrieve_node(state: ChatState, session: AISession) -> ChatState:
-    retriever = session.vectorstore.as_retriever(search_kwargs={"k": 6})
+    retriever = session.vectorstore.as_retriever(search_kwargs={"k": TOP_K})
     docs = retriever.invoke(state["question"])
     state["context"] = docs
     return state

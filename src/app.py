@@ -8,7 +8,10 @@ import streamlit as st
 from logger import get_logger
 logger = get_logger("app")
 
-API_BASE_URL = "http://localhost:8000"
+from config import (
+    API_BASE_URL,
+    MAX_FILE_SIZE,
+)
 
 st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
 
@@ -150,7 +153,7 @@ if not st.session_state.uploaded:
     )
 
     if uploaded_file is not None:
-        if uploaded_file.size > (20*1024*1024):
+        if uploaded_file.size > MAX_FILE_SIZE:
             logger.warning("File too large (filename=%s, size=%d). Maximum allowed file size is 20MB.", uploaded_file.name, uploaded_file.size)
             st.error(f"File too large. Maximum allowed file size is 20MB.")
         else:

@@ -25,6 +25,14 @@ from core_ai import (
 from logger import get_logger
 logger = get_logger("api")
 
+from config import (
+    SESSION_TTL,
+    MAX_FILE_SIZE,
+    FLASK_HOST,
+    FLASK_PORT,
+    CLEANUP_INTERVAL,
+)
+
 # Supported translation languages
 SUPPORTED_LANGUAGES = [
     "Spanish", "French", "German", "Hindi", "Bengali",
@@ -36,7 +44,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Session Store with TTL
-SESSION_TTL_SECONDS = 900
+SESSION_TTL_SECONDS = SESSION_TTL
 # Structure:
 # _sessions = {
 #     session_id (str): {
@@ -96,7 +104,7 @@ def clear_session(session_id: str):
 # Background Cleanup Thread
 def cleanup_expired_sessions():
     while True:
-        time.sleep(60)
+        time.sleep(CLEANUP_INTERVAL)
         now = time.time()
         sessions_to_delete = []
 
@@ -134,7 +142,7 @@ def upload_pdf():
     file_size = file.tell()
     file.seek(0)
 
-    if file_size > (20*1024*1024):
+    if file_size > MAX_FILE_SIZE:
         return jsonify({
             "error": "File too large. Maximum allowed file size is 20MB."
         }), 413
@@ -271,4 +279,4 @@ def translate():
 
 if __name__ == "__main__":
     from waitress import serve
-    serve(app, host="0.0.0.0", port=8000)
+    serve(app, host=FLASK_HOST, port=FLASK_PORT)
