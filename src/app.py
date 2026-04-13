@@ -90,21 +90,28 @@ def upload_pdf(file):
 #         raise
 
 # RAG QA (Non-Streaming)
-def get_answer(question: str) -> str:
+def get_answer(question: str) -> tuple[str, str | None]:
     try:
+        language = st.session_state.get("language", "None")
+
+        payload = {
+            "question": question,
+            "session_id": st.session_state.session_id
+        }
+
+        if language and language != "None":
+            payload["language"] = language
+
         response = requests.post(
             f"{API_BASE_URL}/chat",
-            json={
-                "question": question,
-                "session_id": st.session_state.session_id
-            },
+            json=payload,
             timeout=None
         )
 
         response.raise_for_status()
         data = response.json()
-        return data["answer"]
-        
+        return data["answer"], data.get("translated_answer")
+
     except Exception as e:
         st.error("Failed to get a response from the server.")
         raise
@@ -191,6 +198,7 @@ elif not st.session_state.language_selected:
                 "content": f"**Summary ({selected})**\n\n{translated}"
             })
 
+        st.session_state.language = selected
         st.session_state.language_selected = True
         st.rerun()
 
@@ -225,7 +233,7 @@ else:
         # Non-Streaming response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                answer = get_answer(user_input)
+                answer, translated_answer = get_answer(user_input)
             st.markdown(answer)
 
         # st.session_state.messages.append(
@@ -235,3 +243,14 @@ else:
         st.session_state.messages.append(
             {"role": "assistant", "content": answer}
         )
+
+        if translated_answer:
+            language = st.session_state.get("language", "None")
+            translated_content = f"**Answer ({language})**\n\n{translated_answer}"
+
+            with st.chat_message("assistant"):
+                st.markdown(translated_content)
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": translated_content}
+            )

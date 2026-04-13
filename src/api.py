@@ -16,7 +16,7 @@ import threading
 from core_ai import (
     AISession,
     initialize_session,
-    translate_summary,
+    translate_text,
     # stream_rag_answer,
     get_rag_answer
 )
@@ -213,12 +213,19 @@ def chat():
 
     question = data["question"]
     session_id = data["session_id"]
+    language = data.get("language")  # optional
 
     try:
         session = get_session(session_id)
         answer = get_rag_answer(session, question)
-        
-        return jsonify({"answer": answer}), 200
+
+        response_payload = {"answer": answer}
+
+        if language and language in SUPPORTED_LANGUAGES:
+            translated_answer = translate_text(session._llm, answer, language)
+            response_payload["translated_answer"] = translated_answer
+
+        return jsonify(response_payload), 200
         
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 404
@@ -261,7 +268,7 @@ def translate():
 
     try:
         session = get_session(session_id)
-        translated = translate_summary(session._llm, session.summary, language)
+        translated = translate_text(session._llm, session.summary, language)
         return jsonify({"translated_summary": translated}), 200
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 404

@@ -106,21 +106,25 @@ def split_pdf(pages: List[Document]) -> List[Document]:
 MAP_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are an expert analyst. Write a concise summary of the following document section."
+        "You are an expert analyst. "
+        "You MUST always respond in English, regardless of the language of the document. "
+        "Write a concise summary of the following document section."
     ),
-    ("human", "{text}")
+    ("human", "{text}\n\nRemember: Answer in English only.")
 ])
 
 COMBINE_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are an expert analyst. The following are summaries of sections of a document. "
+        "You are an expert analyst. "
+        "You MUST always respond in English, regardless of the language of the document. "
+        "The following are summaries of sections of a document. "
         "Combine them into a single, concise, high-level summary of the full document. "
-        "Do not add external information."
+        "Do not add external information. "
         "At the end, attach the following: "
         "Please visit the OPD for further consultation."
     ),
-    ("human", "{text}")
+    ("human", "{text}\n\nRemember: Answer in English only.")
 ])
 
 # Summary generation
@@ -136,12 +140,14 @@ def generate_summary(llm: ChatOpenAI, pages: List[Document]) -> str:
             prompt = ChatPromptTemplate.from_messages([
                 (
                     "system",
-                    "You are an expert analyst. Generate a concise, high-level summary "
-                    "of the following document. Do not add external information."
+                    "You are an expert analyst. "
+                    "You MUST always respond in English, regardless of the language of the document. "
+                    "Generate a concise, high-level summary of the following document. "
+                    "Do not add external information. "
                     "At the end, attach the following: "
                     "Please visit the OPD for further consultation."
                 ),
-                ("human", "{text}")
+                ("human", "{text}\n\nRemember: Answer in English only.")
             ])
             chain = prompt | llm | StrOutputParser()
             return chain.invoke({"text": full_text})
@@ -174,14 +180,14 @@ TRANSLATE_PROMPT = ChatPromptTemplate.from_messages([
     ("human", "{text}")
 ])
 
-def translate_summary(llm: ChatOpenAI, summary: str, language: str) -> str:
+def translate_text(llm: ChatOpenAI, text: str, language: str) -> str:
     try:
         chain = TRANSLATE_PROMPT | llm | StrOutputParser()
-        translated = chain.invoke({"text": summary, "language": language})
-        logger.info("Summary translated to %s", language)
+        translated = chain.invoke({"text": text, "language": language})
+        logger.info("Text translated to %s", language)
         return translated
     except Exception as e:
-        logger.exception("Failed to translate summary to %s", language)
+        logger.exception("Failed to translate text to %s", language)
         raise
 
 # Vectorstore creation
@@ -207,11 +213,12 @@ RAG_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "You are a question-answering assistant. "
+        "You MUST always respond in English, regardless of the language of the question. "
         "Answer strictly using the provided context. "
         "If the answer is not contained in the context, say: "
         "'The document does not contain this information.'"
     ),
-    ("human", "Context:\n{context}\n\nQuestion:\n{question}")
+    ("human", "Context:\n{context}\n\nQuestion:\n{question}\n\nRemember: Answer in English only.")
 ])
 
 # LangGraph Retrieval node
