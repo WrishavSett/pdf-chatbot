@@ -15,12 +15,20 @@ from config import (
 
 st.set_page_config(page_title="PDF RAG Chatbot", layout="centered")
 
+# Helper functions
+def fetch_languages() -> list:
+    try:
+        response = requests.get(f"{API_BASE_URL}/languages")
+        response.raise_for_status()
+        return response.json()["languages"]
+    except Exception as e:
+        logger.exception("Failed to fetch supported languages.")
+        st.error("Failed to fetch supported languages.")
+        raise
+
 # Session State initialization
 if "uploaded" not in st.session_state:
     st.session_state.uploaded = False
-
-if "language_selected" not in st.session_state:
-    st.session_state.language_selected = False
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
@@ -30,6 +38,9 @@ if "summary" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "languages" not in st.session_state:
+    st.session_state.languages = fetch_languages()
 
 # Helper functions
 def reset_chat():
@@ -52,18 +63,25 @@ def reset_chat():
     logger.debug("Streamlit session state cleared")
     st.rerun()
 
-def upload_pdf(file):
+def upload_pdf(file, language: str | None):
     try:
+        form_data = {"file": file}
+        extra_fields = {}
+
+        if language and language != "None":
+            extra_fields["language"] = language
+
         with st.spinner("Processing PDF. Please wait..."):
             response = requests.post(
                 f"{API_BASE_URL}/upload",
-                files={"file": file},
+                files=form_data,
+                data=extra_fields,
                 timeout=None
             )
 
         response.raise_for_status()
         data = response.json()
-        return data["session_id"], data["summary"]
+        return data["session_id"], data["summary"], data.get("translated_summary")
     except Exception as e:
         st.error("Failed to upload and process PDF.")
         raise
@@ -116,31 +134,6 @@ def get_answer(question: str) -> tuple[str, str | None]:
         st.error("Failed to get a response from the server.")
         raise
 
-def fetch_languages() -> list:
-    try:
-        response = requests.get(f"{API_BASE_URL}/languages")
-        response.raise_for_status()
-        return response.json()["languages"]
-    except Exception as e:
-        st.error("Failed to fetch supported languages.")
-        raise
-
-def translate_summary_request(language: str) -> str:
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/translate",
-            json={
-                "session_id": st.session_state.session_id,
-                "language": language
-            },
-            timeout=None
-        )
-        response.raise_for_status()
-        return response.json()["translated_summary"]
-    except Exception as e:
-        st.error("Failed to translate summary.")
-        raise
-
 # UI Rendering
 st.title("PDF Chatbot")
 
@@ -159,48 +152,42 @@ if not st.session_state.uploaded:
         accept_multiple_files=False
     )
 
-    if uploaded_file is not None:
+    languages = st.session_state.languages
+    options = ["None"] + languages
+    selected_language = st.selectbox("Translate summary to (optional)", options)
+
+    submit = st.button("Upload", disabled=uploaded_file is None)
+
+    if submit and uploaded_file is not None:
         if uploaded_file.size > MAX_FILE_SIZE:
-            logger.warning("File too large (filename=%s, size=%d). Maximum allowed file size is 20MB.", uploaded_file.name, uploaded_file.size)
-            st.error(f"File too large. Maximum allowed file size is 20MB.")
+            logger.warning(
+                "File too large (filename=%s, size=%d). Maximum allowed file size is 20MB.",
+                uploaded_file.name, uploaded_file.size
+            )
+            st.error("File too large. Maximum allowed file size is 20MB.")
         else:
-            session_id, summary = upload_pdf(uploaded_file)
+            session_id, summary, translated_summary = upload_pdf(uploaded_file, selected_language)
 
             st.session_state.uploaded = True
             st.session_state.session_id = session_id
             st.session_state.summary = summary
+            st.session_state.language = selected_language
+
+            if selected_language and selected_language != "None":
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"**Summary (English)**\n\n{summary}"
+                })
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"**Summary ({selected_language})**\n\n{translated_summary}"
+                })
+            else:
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": summary}
+                )
 
             st.rerun()
-
-# Language Selection Screen
-elif not st.session_state.language_selected:
-    st.subheader("Would you like the summary in another language?")
-
-    languages = fetch_languages()
-    options = ["None"] + languages
-    selected = st.selectbox("Select a language", options)
-
-    if st.button("Continue"):
-        if selected == "None":
-            st.session_state.messages.append(
-                {"role": "assistant", "content": st.session_state.summary}
-            )
-        else:
-            with st.spinner(f"Translating summary to {selected}..."):
-                translated = translate_summary_request(selected)
-
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"**Summary (English)**\n\n{st.session_state.summary}"
-            })
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"**Summary ({selected})**\n\n{translated}"
-            })
-
-        st.session_state.language = selected
-        st.session_state.language_selected = True
-        st.rerun()
 
 # Chat Screen
 else:

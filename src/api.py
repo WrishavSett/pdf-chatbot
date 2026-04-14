@@ -147,6 +147,8 @@ def upload_pdf():
             "error": "File too large. Maximum allowed file size is 20MB."
         }), 413
 
+    language = request.form.get("language")
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         file.save(tmp.name)
         pdf_path = tmp.name
@@ -156,12 +158,18 @@ def upload_pdf():
         session_id = str(uuid.uuid4())
         set_session(session_id, session)
 
-        return jsonify(
-            {
-                "session_id": session_id,
-                "summary": session.summary
-            }
-        ), 201
+        response_payload = {
+            "session_id": session_id,
+            "summary": session.summary
+        }
+
+        if language and language in SUPPORTED_LANGUAGES:
+            logger.info("Translating summary to %s during upload (session_id=%s)", language, session_id)
+            translated_summary = translate_text(session._llm, session.summary, language)
+            response_payload["translated_summary"] = translated_summary
+
+        return jsonify(response_payload), 201
+
     except Exception as e:
         logger.exception("Failed to process uploaded PDF (filename=%s)", file.filename)
         return jsonify({"error": "Failed to process PDF"}), 500
@@ -248,33 +256,6 @@ def reset():
 @app.route("/languages", methods=["GET"])
 def get_languages():
     return jsonify({"languages": SUPPORTED_LANGUAGES}), 200
-
-# Translate summary
-@app.route("/translate", methods=["POST"])
-def translate():
-    data = request.get_json()
-
-    if not data or "session_id" not in data:
-        return jsonify({"error": "Missing session_id"}), 400
-
-    if "language" not in data:
-        return jsonify({"error": "Missing language"}), 400
-
-    language = data["language"]
-    if language not in SUPPORTED_LANGUAGES:
-        return jsonify({"error": f"Unsupported language: {language}"}), 400
-
-    session_id = data["session_id"]
-
-    try:
-        session = get_session(session_id)
-        translated = translate_text(session._llm, session.summary, language)
-        return jsonify({"translated_summary": translated}), 200
-    except RuntimeError as e:
-        return jsonify({"error": str(e)}), 404
-    except Exception as e:
-        logger.exception("Failed to translate summary (session_id=%s)", session_id)
-        return jsonify({"error": "Failed to translate summary"}), 500
 
 # Local Dev entry point
 # if __name__ == "__main__":
