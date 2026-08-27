@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Chatbot — Desun Hospital</title>
+
+  <!-- Google Fonts: Inter for UI, Noto Sans for multilingual support -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       SCREEN 1: UPLOAD SCREEN
+       Shown on initial load. Hidden after successful upload.
+  ============================================================ -->
+  <div id="screen-upload" class="screen active">
+
+    <!-- Top navigation bar -->
+    <header class="navbar">
+      <div class="navbar__brand">
+        <div class="navbar__bot-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="8" width="20" height="14" rx="4" fill="#1a56db"/>
+            <circle cx="10" cy="14" r="2" fill="white"/>
+            <circle cx="18" cy="14" r="2" fill="white"/>
+            <rect x="11" y="17" width="6" height="1.5" rx="0.75" fill="white"/>
+            <rect x="12" y="3" width="4" height="5" rx="2" fill="#1a56db"/>
+            <rect x="2" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+            <rect x="23" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="navbar__title">PDF Chatbot</h1>
+          <p class="navbar__subtitle">Upload a PDF document and start asking questions.</p>
+        </div>
+      </div>
+      <img src="assets/desun-logo.png" alt="Desun Hospital" class="navbar__logo" />
+    </header>
+
+    <!-- Main content area -->
+    <main class="upload-main">
+
+      <!-- Drop zone card -->
+      <section class="card drop-zone-card" aria-label="PDF upload area">
+        <div
+          id="drop-zone"
+          class="drop-zone"
+          role="button"
+          tabindex="0"
+          aria-label="Drag and drop your PDF here, or click to choose a file"
+        >
+          <!-- Upload cloud icon -->
+          <div class="drop-zone__icon" aria-hidden="true">
+            <svg width="56" height="48" viewBox="0 0 56 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M44 36H40M12 36H8C4.686 36 2 33.314 2 30C2 27.018 4.018 24.516 6.786 23.916C6.274 22.716 6 21.394 6 20C6 14.477 10.477 10 16 10C17.118 10 18.196 10.18 19.206 10.514C21.068 6.636 25.12 4 29.8 4C36.428 4 41.8 9.372 41.8 16C41.8 16.338 41.786 16.672 41.76 17C44.21 17.67 46 19.926 46 22.6C46 24.136 45.402 25.532 44.424 26.562" stroke="#1a56db" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M28 44V24M28 24L22 30M28 24L34 30" stroke="#1a56db" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <p class="drop-zone__heading">Drag &amp; drop your PDF here</p>
+          <p class="drop-zone__or">or</p>
+
+          <!-- Hidden native file input -->
+          <input
+            type="file"
+            id="file-input"
+            accept=".pdf"
+            aria-label="Choose a PDF file"
+            hidden
+          />
+          <button
+            type="button"
+            class="btn btn--primary btn--icon"
+            id="choose-file-btn"
+            aria-controls="file-input"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Choose PDF File
+          </button>
+
+          <p class="drop-zone__hint">Only PDF files are supported. Max file size: 20&nbsp;MB</p>
+
+          <!-- Selected file preview (hidden until file chosen) -->
+          <div id="file-preview" class="file-preview hidden" aria-live="polite">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e03535" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span id="file-preview-name" class="file-preview__name"></span>
+            <span id="file-preview-size" class="file-preview__size"></span>
+            <button type="button" class="file-preview__remove" id="remove-file-btn" aria-label="Remove selected file">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Language selector card -->
+      <section class="card language-card" aria-label="Language selection">
+        <div class="language-card__header">
+          <span class="language-card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+          </span>
+          <div>
+            <h2 class="language-card__title">Language</h2>
+            <p class="language-card__desc">Select a language for responses (optional)</p>
+          </div>
+        </div>
+        <div class="select-wrapper">
+          <select id="language-select" class="select" aria-label="Select response language">
+            <option value="">English (no translation)</option>
+            <!-- Options injected by JS from GET /languages -->
+          </select>
+          <svg class="select-wrapper__caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- How it works card -->
+      <section class="card how-card" aria-label="How it works">
+        <h2 class="how-card__title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          How it works
+        </h2>
+        <ol class="how-list" aria-label="Steps">
+          <li class="how-list__item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Upload your PDF document
+          </li>
+          <li class="how-list__item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Get an AI-generated summary of the document
+          </li>
+          <li class="how-list__item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Ask questions and get answers
+          </li>
+          <li class="how-list__item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            View answers in your selected language
+          </li>
+        </ol>
+      </section>
+
+      <!-- Upload & Process CTA -->
+      <button
+        type="button"
+        id="upload-btn"
+        class="btn btn--primary btn--full btn--cta"
+        disabled
+        aria-disabled="true"
+      >
+        <span id="upload-btn-label">Upload &amp; Process</span>
+        <svg id="upload-btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+        <!-- Spinner shown during upload -->
+        <svg id="upload-btn-spinner" class="spinner hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M12 2a10 10 0 0 1 10 10"/>
+        </svg>
+      </button>
+
+      <!-- Inline error message for upload screen -->
+      <div id="upload-error" class="error-banner hidden" role="alert" aria-live="assertive"></div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer__wave" aria-hidden="true"></div>
+      <div class="footer__content">
+        <img src="assets/datacore-logo.png" alt="Data-Core Systems" class="footer__logo" />
+      </div>
+    </footer>
+
+  </div><!-- /#screen-upload -->
+
+
+  <!-- ============================================================
+       SCREEN 2: CHAT SCREEN
+       Hidden on load. Shown after successful upload.
+  ============================================================ -->
+  <div id="screen-chat" class="screen hidden">
+
+    <!-- Top navigation bar (chat variant) -->
+    <header class="navbar navbar--chat">
+      <div class="navbar__brand">
+        <div class="navbar__bot-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="8" width="20" height="14" rx="4" fill="#1a56db"/>
+            <circle cx="10" cy="14" r="2" fill="white"/>
+            <circle cx="18" cy="14" r="2" fill="white"/>
+            <rect x="11" y="17" width="6" height="1.5" rx="0.75" fill="white"/>
+            <rect x="12" y="3" width="4" height="5" rx="2" fill="#1a56db"/>
+            <rect x="2" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+            <rect x="23" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="navbar__title">PDF Chatbot</h1>
+          <p class="navbar__subtitle">Ask questions about your document</p>
+        </div>
+      </div>
+      <img src="assets/desun-logo.png" alt="Desun Hospital" class="navbar__logo" />
+    </header>
+
+    <main class="chat-main">
+
+      <!-- File info bar: filename, size, language, new chat -->
+      <div class="file-info-bar card" aria-label="Current document info">
+        <div class="file-info-bar__left">
+          <!-- PDF icon -->
+          <div class="file-info-bar__pdf-icon" aria-hidden="true">
+            <svg width="28" height="32" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="28" height="32" rx="4" fill="#fee2e2"/>
+              <path d="M6 10h10M6 14h10M6 18h6" stroke="#e03535" stroke-width="1.8" stroke-linecap="round"/>
+              <text x="14" y="29" font-size="7" font-weight="700" fill="#e03535" text-anchor="middle" font-family="Inter,sans-serif">PDF</text>
+            </svg>
+          </div>
+          <div>
+            <p id="info-filename" class="file-info-bar__filename">—</p>
+            <p id="info-meta" class="file-info-bar__meta">—</p>
+          </div>
+        </div>
+
+        <div class="file-info-bar__lang">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <div>
+            <p class="file-info-bar__lang-label">Response language</p>
+            <p id="info-language" class="file-info-bar__lang-value">English</p>
+          </div>
+        </div>
+
+        <div class="file-info-bar__right">
+          <button type="button" id="start-over-btn" class="btn btn--outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="1 4 1 10 7 10"/>
+              <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+            </svg>
+            New Chat
+          </button>
+          <p class="file-info-bar__start-over-hint">This will clear the current session and start a new one.</p>
+        </div>
+      </div>
+
+      <!-- Document Summary section -->
+      <section class="summary-section card" aria-label="Document summary">
+        <div class="section-header">
+          <span class="section-header__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </span>
+          <div>
+            <h2 class="section-header__title">Document Summary</h2>
+            <p class="section-header__desc">AI-generated overview of your document.</p>
+          </div>
+        </div>
+
+        <!-- English summary block -->
+        <div class="summary-block summary-block--english">
+          <span class="summary-block__label">English Summary</span>
+          <p id="summary-english" class="summary-block__text"></p>
+        </div>
+
+        <!-- Translated summary block — only rendered when a language was selected -->
+        <div id="summary-translated-block" class="summary-block summary-block--translated hidden">
+          <span id="summary-translated-label" class="summary-block__label"></span>
+          <p id="summary-translated" class="summary-block__text"></p>
+        </div>
+      </section>
+
+      <!-- Ask Questions / Chat section -->
+      <section class="chat-section card" aria-label="Ask questions">
+        <div class="section-header">
+          <span class="section-header__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+              <rect x="4" y="8" width="20" height="14" rx="4" fill="#1a56db"/>
+              <circle cx="10" cy="14" r="2" fill="white"/>
+              <circle cx="18" cy="14" r="2" fill="white"/>
+              <rect x="11" y="17" width="6" height="1.5" rx="0.75" fill="white"/>
+              <rect x="12" y="3" width="4" height="5" rx="2" fill="#1a56db"/>
+              <rect x="2" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+              <rect x="23" y="12" width="3" height="5" rx="1.5" fill="#1a56db"/>
+            </svg>
+          </span>
+          <div>
+            <h2 class="section-header__title">Ask Questions</h2>
+            <p class="section-header__desc">Start a conversation about your document.</p>
+          </div>
+        </div>
+
+        <!-- Scrollable chat message list -->
+        <div id="chat-messages" class="chat-messages" role="log" aria-label="Chat messages" aria-live="polite">
+          <!-- Messages injected by JS -->
+        </div>
+
+        <!-- Inline error message for chat -->
+        <div id="chat-error" class="error-banner hidden" role="alert" aria-live="assertive"></div>
+
+        <!-- Chat input bar -->
+        <div class="chat-input-bar">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input"
+            placeholder="Type your question here..."
+            aria-label="Type your question"
+            autocomplete="off"
+            disabled
+          />
+          <button
+            type="button"
+            id="send-btn"
+            class="btn btn--send"
+            disabled
+            aria-label="Send message"
+          >
+            <!-- Arrow icon (shown when idle) -->
+            <svg id="send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            <!-- Spinner (shown while waiting for answer) -->
+            <svg id="send-spinner" class="spinner hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <path d="M12 2a10 10 0 0 1 10 10"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer (chat screen) -->
+    <footer class="footer">
+      <div class="footer__wave" aria-hidden="true"></div>
+      <div class="footer__content">
+        <img src="assets/datacore-logo.png" alt="Data-Core Systems" class="footer__logo" />
+      </div>
+    </footer>
+
+  </div><!-- /#screen-chat -->
+
+  <!-- JS modules -->
+  <script src="js/api.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/upload.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
